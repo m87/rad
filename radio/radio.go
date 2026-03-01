@@ -54,7 +54,7 @@ func (r *Radio) Play() error {
 	defer resp.Body.Close()
 
 	slog.Info("Connected to radio stream", "status", resp.Status)
-	slog.Info("Radio sattion metadata", "headers", resp.Header)
+	slog.Debug("Radio station metadata", "headers", resp.Header)
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		panic("Failed to connect to radio stream: " + resp.Status)
@@ -69,7 +69,7 @@ func (r *Radio) Play() error {
 			icyMetaInt = 0
 		}
 	}
-	slog.Info("Icy-MetaInt value", "icy_meta_int", icyMetaInt)
+	slog.Debug("Icy-MetaInt value", "icy_meta_int", icyMetaInt)
 
 	reader := bufio.NewReaderSize(resp.Body, 64*1024)
 	buf := make([]byte, 4*1024)
@@ -137,13 +137,15 @@ func (r *Radio) Play() error {
 				slog.Error("Error reading from radio stream", "error", err)
 				return err
 			}
-			slog.Info("Received metadata", "metadata", string(metaData))
+			slog.Debug("Received raw metadata", "metadata", string(metaData))
+			metadata := ParseMetadata(string(metaData))
+			slog.Info("Received metadata", "metadata", metadata)
 		}
 
 		total += int64(icyMetaInt)
 		bytesSince += int64(icyMetaInt)
 		if time.Since(lastPrint) > 10*time.Second {
-			slog.Info("Received audio data", "total_bytes", total, "bytes_since_last_print", bytesSince)
+			slog.Debug("Received audio data", "total_bytes", total, "bytes_since_last_print", bytesSince)
 			lastPrint = time.Now()
 			bytesSince = 0
 		}
