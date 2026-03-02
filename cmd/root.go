@@ -13,13 +13,14 @@ import (
 
 var cfgFile string
 var url string
+var player string
 
 var rootCmd = &cobra.Command{
 	Use:   "rad",
 	Short: "Online radio player for the terminal",
 	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		err := play(args[0])
+		err := play(args[0], player)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "Error playing radio:", err)
 			os.Exit(1)
@@ -30,7 +31,7 @@ var rootCmd = &cobra.Command{
 func Execute() {
 	if len(os.Args) > 1 && shouldPlayDirectly(os.Args[1]) {
 		initConfig()
-		err := play(os.Args[1])
+		err := play(os.Args[1], player)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "Error playing radio:", err)
 			os.Exit(1)
@@ -44,7 +45,7 @@ func Execute() {
 	}
 }
 
-func play(input string) error {
+func play(input string, player string) error {
 	url := input
 
 	stations := viper.GetStringMap("stations")
@@ -75,7 +76,7 @@ func play(input string) error {
 	}
 
 	r := radio.NewRadio(url)
-	return r.Play()
+	return r.Play(player)
 }
 
 func shouldPlayDirectly(firstArg string) bool {
@@ -101,6 +102,7 @@ func init() {
 	cobra.OnInitialize(initConfig)
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.rad.yaml)")
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	rootCmd.Flags().StringVarP(&player, "player", "p", "native", "Audio player to use (mpv or native)")
 }
 
 func initConfig() {

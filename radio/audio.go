@@ -1,30 +1,63 @@
 package radio
 
 import (
+	"bytes"
 	"io"
-	"log/slog"
-	"os/exec"
+	"time"
+
+	"github.com/ebitengine/oto/v3"
+	"github.com/hajimehoshi/ebiten/v2/audio/mp3"
 )
 
-type AudioPlayer struct {
-	cmd   *exec.Cmd
-	stdin io.WriteCloser
+type AudioPlayer interface {
+	Play(reader io.Reader) error
 }
 
-func NewAudioPlayer() *AudioPlayer {
-	return &AudioPlayer{}
+type NativeAudioPlayer struct {
+	reader io.Reader
 }
 
-func (p *AudioPlayer) Init() error {
-	p.cmd = exec.Command("mpv", "--no-terminal", "--", "-")
-	stdin, _ := p.cmd.StdinPipe()
-	p.stdin = stdin
-	p.cmd.Start()
-	slog.Info("Started mpv process with PID", "pid", p.cmd.Process.Pid)
-	return nil
+func NewNativeAudioPlayer() *NativeAudioPlayer {
+	return &NativeAudioPlayer{
+		reader: bytes.NewReader(nil),
+	}
 }
 
-func (p *AudioPlayer) Write(data []byte) error {
-	_, err := p.stdin.Write(data)
-	return err
+func (p *NativeAudioPlayer) Play(reader io.Reader) error {
+	pcmStream, err := mp3.DecodeWithoutResampling(reader)
+	if err != nil {
+		return err
+	}
+
+	sr := pcmStream.SampleRate()
+
+	op := oto.NewContextOptions{
+		SampleRate:   sr,
+		ChannelCount: 2,
+		Format:       oto.FormatSignedInt16LE,
+	}
+
+	otoCtx, ready, err := oto.NewContext(&op)
+	if err != nil {
+		return err
+	}
+	<-ready
+
+	player := otoCtx.NewPlayer(pcmStream)
+	player.Play()
+
+	for {
+		if err := player.Err(); err != nil {
+			return err
+		}
+		if err := otoCtx.Err(); err != nil {
+			return err
+		}
+
+		if !player.IsPlaying() && player.BufferedSize() == 0 {
+			return nil
+		}
+
+		time.Sleep(200 * time.Millisecond)
+	}
 }

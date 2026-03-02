@@ -3,7 +3,6 @@ package radio
 import (
 	"bufio"
 	"context"
-	"io"
 	"log/slog"
 	"net"
 	"net/http"
@@ -23,7 +22,7 @@ func NewRadio(url string) *Radio {
 	}
 }
 
-func (r *Radio) Play() error {
+func (r *Radio) Play(player string) error {
 	slog.Info("Playing radio from URL", "url", r.url)
 	httpClient := &http.Client{
 		Transport: &http.Transport{
@@ -71,84 +70,19 @@ func (r *Radio) Play() error {
 	}
 	slog.Debug("Icy-MetaInt value", "icy_meta_int", icyMetaInt)
 
-	reader := bufio.NewReaderSize(resp.Body, 64*1024)
-	buf := make([]byte, 4*1024)
-	var total int64
-	lastPrint := time.Now()
-	var bytesSince int64
-	metaLen := make([]byte, 1)
+	src := bufio.NewReaderSize(resp.Body, 64*1024)
 
-	audioPlayer := NewAudioPlayer()
-	err = audioPlayer.Init()
+	reader, err := NewReader(src, icyMetaInt, func(metadata Metadata, raw string) {
+		slog.Info("Received metadata", "metadata", metadata)
+	})
 	if err != nil {
-		slog.Error("Error initializing audio player", "error", err)
 		return err
 	}
 
-	for {
-
-		audioLeft := icyMetaInt
-		for audioLeft > 0 {
-			chunk := len(buf)
-			if audioLeft < chunk {
-				chunk = audioLeft
-			}
-
-			n, err := io.ReadFull(reader, buf[:chunk])
-			err = audioPlayer.Write(buf[:n])
-
-			if err != nil {
-				slog.Error("Error writing to mpv stdin", "error", err)
-				return err
-			}
-
-			if err != nil {
-				if err == io.EOF {
-					slog.Info("Radio stream ended")
-					return nil
-				}
-
-				slog.Error("Error reading from radio stream", "error", err)
-				return err
-			}
-
-			audioLeft -= n
-		}
-
-		_, err := io.ReadFull(reader, metaLen)
-		if err != nil {
-			if err == io.EOF {
-				slog.Info("Radio stream ended")
-				return nil
-			}
-
-			slog.Error("Error reading from radio stream", "error", err)
-			return err
-		}
-		metaData := make([]byte, int(metaLen[0])*16)
-		if metaLen[0] > 0 {
-			_, err := io.ReadFull(reader, metaData)
-			if err != nil {
-				if err == io.EOF {
-					slog.Info("Radio stream ended")
-					return nil
-				}
-
-				slog.Error("Error reading from radio stream", "error", err)
-				return err
-			}
-			slog.Debug("Received raw metadata", "metadata", string(metaData))
-			metadata := ParseMetadata(string(metaData))
-			slog.Info("Received metadata", "metadata", metadata)
-		}
-
-		total += int64(icyMetaInt)
-		bytesSince += int64(icyMetaInt)
-		if time.Since(lastPrint) > 10*time.Second {
-			slog.Debug("Received audio data", "total_bytes", total, "bytes_since_last_print", bytesSince)
-			lastPrint = time.Now()
-			bytesSince = 0
-		}
+	if player == "mpv" {
+		return NewMpvAudioPlayer().Play(reader)
+	} else {
+		return NewNativeAudioPlayer().Play(reader)
 	}
 
 }
