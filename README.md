@@ -139,9 +139,3 @@ $HOME/.local/state/rad/rad.sock
 	- ensure socket file exists under `$HOME/.local/state/rad/`.
 - `--player mpv` fails:
 	- install `mpv` and confirm it is available in `PATH`.
-
-## Roadmap ideas
-
-- Better status output formatting
-- More metadata fields
-- Pause/stop/volume control via socket commands
