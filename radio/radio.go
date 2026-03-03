@@ -3,17 +3,35 @@ package radio
 import (
 	"bufio"
 	"context"
+	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
 	"strconv"
+	"strings"
+	"sync"
 	"time"
 )
 
 const version = "0.0.1"
 
+type Status struct {
+	Metadata Metadata `json:"metadata"`
+	playing  bool     `json:"playing"`
+}
+
 type Radio struct {
-	url string
+	mu       sync.RWMutex
+	url      string
+	metadata Metadata
+	playing  bool
+}
+
+func (r *Radio) GetMetadata() Metadata {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.metadata
 }
 
 func NewRadio(url string) *Radio {
@@ -74,15 +92,43 @@ func (r *Radio) Play(player string) error {
 
 	reader, err := NewReader(src, icyMetaInt, func(metadata Metadata, raw string) {
 		slog.Info("Received metadata", "metadata", metadata)
+		r.mu.Lock()
+		r.metadata = metadata
+		r.mu.Unlock()
 	})
 	if err != nil {
 		return err
 	}
 
 	if player == "mpv" {
-		return NewMpvAudioPlayer().Play(reader)
+		go NewMpvAudioPlayer().Play(reader)
 	} else {
-		return NewNativeAudioPlayer().Play(reader)
+		go NewNativeAudioPlayer().Play(reader)
 	}
 
+	if err := RunServer(r, func(conn net.Conn, radio *Radio) {
+		defer conn.Close()
+		br := bufio.NewReader(conn)
+		line, err := br.ReadString('\n')
+		if err != nil {
+			slog.Error("Failed to read command", "err", err)
+			return
+		}
+		line = strings.TrimSpace(strings.ToUpper(line))
+
+		resp := &Status{
+			Metadata: radio.GetMetadata(),
+			playing:  radio.playing,
+		}
+		switch line {
+		case "METADATA":
+			_ = json.NewEncoder(conn).Encode(resp)
+		default:
+			fmt.Fprintf(conn, "Unknown command: %s\n", line)
+		}
+
+	}); err != nil {
+		return err
+	}
+	return nil
 }
