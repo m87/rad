@@ -12,7 +12,6 @@ import (
 )
 
 var cfgFile string
-var url string
 var player string
 
 var rootCmd = &cobra.Command{
@@ -31,6 +30,7 @@ var rootCmd = &cobra.Command{
 func Execute() {
 	if len(os.Args) > 1 && shouldPlayDirectly(os.Args[1]) {
 		initConfig()
+		rootCmd.ParseFlags(os.Args[1:])
 		err := play(os.Args[1], player)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "Error playing radio:", err)
@@ -101,7 +101,6 @@ func shouldPlayDirectly(firstArg string) bool {
 func init() {
 	cobra.OnInitialize(initConfig)
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.rad.yaml)")
-	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 	rootCmd.Flags().StringVarP(&player, "player", "p", "native", "Audio player to use (mpv or native)")
 }
 
@@ -123,7 +122,5 @@ func initConfig() {
 	}
 
 	viper.AutomaticEnv()
-
-	if err := viper.ReadInConfig(); err == nil {
-	}
+	_ = viper.ReadInConfig()
 }

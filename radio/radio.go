@@ -5,9 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -18,7 +20,7 @@ const version = "0.0.1"
 
 type Status struct {
 	Metadata Metadata `json:"metadata"`
-	playing  bool     `json:"playing"`
+	Playing  bool     `json:"playing"`
 }
 
 type Radio struct {
@@ -74,37 +76,45 @@ func (r *Radio) Play(player string) error {
 	slog.Debug("Radio station metadata", "headers", resp.Header)
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		panic("Failed to connect to radio stream: " + resp.Status)
+		return fmt.Errorf("failed to connect to radio stream: %s", resp.Status)
 	}
-
-	icyMetaInt := 16000
-	if val := resp.Header.Get("Icy-MetaInt"); val != "" {
-		var err error
-		icyMetaInt, err = strconv.Atoi(val)
-		if err != nil {
-			slog.Warn("Invalid Icy-MetaInt header, ignoring", "value", val)
-			icyMetaInt = 0
-		}
-	}
-	slog.Debug("Icy-MetaInt value", "icy_meta_int", icyMetaInt)
 
 	src := bufio.NewReaderSize(resp.Body, 64*1024)
 
-	reader, err := NewReader(src, icyMetaInt, func(metadata Metadata, raw string) {
-		slog.Info("Received metadata", "metadata", metadata)
-		r.mu.Lock()
-		r.metadata = metadata
-		r.mu.Unlock()
-	})
-	if err != nil {
-		return err
+	var audioReader io.Reader = src
+
+	if val := resp.Header.Get("Icy-MetaInt"); val != "" {
+		icyMetaInt, err := strconv.Atoi(val)
+		if err != nil {
+			slog.Warn("Invalid Icy-MetaInt header, ignoring", "value", val)
+		} else {
+			slog.Debug("Icy-MetaInt value", "icy_meta_int", icyMetaInt)
+			icyReader, err := NewReader(src, icyMetaInt, func(metadata Metadata, raw string) {
+				slog.Info("Received metadata", "metadata", metadata)
+				r.mu.Lock()
+				r.metadata = metadata
+				r.mu.Unlock()
+			})
+			if err != nil {
+				return err
+			}
+			audioReader = icyReader
+		}
 	}
 
+	errCh := make(chan error, 1)
 	if player == "mpv" {
-		go NewMpvAudioPlayer().Play(reader)
+		go func() { errCh <- NewMpvAudioPlayer().Play(audioReader) }()
 	} else {
-		go NewNativeAudioPlayer().Play(reader)
+		go func() { errCh <- NewNativeAudioPlayer().Play(audioReader) }()
 	}
+
+	go func() {
+		if err := <-errCh; err != nil {
+			slog.Error("Audio player error", "err", err)
+			os.Exit(1)
+		}
+	}()
 
 	if err := RunServer(r, func(conn net.Conn, radio *Radio) {
 		defer conn.Close()
@@ -116,9 +126,12 @@ func (r *Radio) Play(player string) error {
 		}
 		line = strings.TrimSpace(strings.ToUpper(line))
 
+		radio.mu.RLock()
+		playing := radio.playing
+		radio.mu.RUnlock()
 		resp := &Status{
 			Metadata: radio.GetMetadata(),
-			playing:  radio.playing,
+			Playing:  playing,
 		}
 		switch line {
 		case "METADATA":

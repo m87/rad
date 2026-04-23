@@ -5,23 +5,19 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"path/filepath"
 
+	"github.com/m87/rad/radio"
 	"github.com/spf13/cobra"
 )
 
-func stateDir() string {
-	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".local", "state", "rad")
-}
-func sockPath() string { return filepath.Join(stateDir(), "rad.sock") }
-
 var statusCmd = &cobra.Command{
-	Use: "status",
+	Use:   "status",
+	Short: "Show current track metadata",
 	Run: func(cmd *cobra.Command, args []string) {
-		c, err := net.Dial("unix", sockPath())
+		c, err := net.Dial("unix", radio.SockPath())
 		if err != nil {
-			return
+			fmt.Fprintln(os.Stderr, "Could not connect to rad (is it running?)")
+			os.Exit(1)
 		}
 		defer c.Close()
 

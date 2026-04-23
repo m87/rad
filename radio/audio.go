@@ -1,7 +1,6 @@
 package radio
 
 import (
-	"bytes"
 	"io"
 	"time"
 
@@ -13,14 +12,10 @@ type AudioPlayer interface {
 	Play(reader io.Reader) error
 }
 
-type NativeAudioPlayer struct {
-	reader io.Reader
-}
+type NativeAudioPlayer struct{}
 
 func NewNativeAudioPlayer() *NativeAudioPlayer {
-	return &NativeAudioPlayer{
-		reader: bytes.NewReader(nil),
-	}
+	return &NativeAudioPlayer{}
 }
 
 func (p *NativeAudioPlayer) Play(reader io.Reader) error {

@@ -7,17 +7,18 @@ import (
 	"path/filepath"
 )
 
-func stateDir() string {
+func StateDir() string {
 	home, _ := os.UserHomeDir()
 	return filepath.Join(home, ".local", "state", "rad")
 }
-func sockPath() string { return filepath.Join(stateDir(), "rad.sock") }
+
+func SockPath() string { return filepath.Join(StateDir(), "rad.sock") }
 
 func RunServer(radio *Radio, handler func(conn net.Conn, radio *Radio)) error {
-	_ = os.MkdirAll(stateDir(), 0755)
-	_ = os.Remove(sockPath())
+	_ = os.MkdirAll(StateDir(), 0755)
+	_ = os.Remove(SockPath())
 
-	l, err := net.Listen("unix", sockPath())
+	l, err := net.Listen("unix", SockPath())
 	if err != nil {
 		return err
 	}

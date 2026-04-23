@@ -1,6 +1,9 @@
 package cmd
 
 import (
+	"fmt"
+	"os"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -22,14 +25,16 @@ func NewAddCmd() *cobra.Command {
 			}
 			stations[alias] = url
 			viper.Set("stations", stations)
-			err := viper.WriteConfig()
-			if err != nil {
-				panic("Failed to write config file: " + err.Error())
+			if err := viper.WriteConfig(); err != nil {
+				fmt.Fprintln(os.Stderr, "Failed to write config file:", err)
+				os.Exit(1)
 			}
 		},
 	}
 	cmd.Flags().StringVarP(&url, "url", "u", "", "URL of the radio station")
 	cmd.Flags().StringVarP(&alias, "alias", "a", "", "Alias for the radio station")
+	_ = cmd.MarkFlagRequired("url")
+	_ = cmd.MarkFlagRequired("alias")
 
 	return cmd
 }
