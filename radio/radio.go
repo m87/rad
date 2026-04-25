@@ -103,11 +103,9 @@ func (r *Radio) Play(player string) error {
 	}
 
 	errCh := make(chan error, 1)
-	if player == "mpv" {
-		go func() { errCh <- NewMpvAudioPlayer().Play(audioReader) }()
-	} else {
-		go func() { errCh <- NewNativeAudioPlayer().Play(audioReader) }()
-	}
+	go func() {
+		errCh <- playAudio(player, audioReader)
+	}()
 
 	go func() {
 		if err := <-errCh; err != nil {
@@ -144,5 +142,24 @@ func (r *Radio) Play(player string) error {
 	}); err != nil {
 		return err
 	}
+	return nil
+}
+
+func playAudio(player string, audioReader io.Reader) error {
+	if player == "mpv" {
+		return NewMpvAudioPlayer().Play(audioReader)
+	}
+
+	if player != "native" {
+		return fmt.Errorf("unknown player: %s", player)
+	}
+
+	if err := NewNativeAudioPlayer().Play(audioReader); err != nil {
+		slog.Warn("native audio failed, falling back to mpv", "err", err)
+		if mpvErr := NewMpvAudioPlayer().Play(audioReader); mpvErr != nil {
+			return fmt.Errorf("native playback failed: %w; mpv fallback failed: %w", err, mpvErr)
+		}
+	}
+
 	return nil
 }

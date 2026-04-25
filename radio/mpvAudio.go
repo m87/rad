@@ -1,6 +1,7 @@
 package radio
 
 import (
+	"fmt"
 	"io"
 	"log/slog"
 	"os"
@@ -15,6 +16,10 @@ func NewMpvAudioPlayer() *MpvAudioPlayer {
 }
 
 func (p *MpvAudioPlayer) Play(reader io.Reader) error {
+	if _, err := exec.LookPath("mpv"); err != nil {
+		return fmt.Errorf("mpv is not installed or not in PATH")
+	}
+
 	cmd := exec.Command("mpv", "--no-terminal", "--quiet", "--audio-client-name=Rad Player", "-")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
