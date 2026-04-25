@@ -10,6 +10,8 @@ builds:
   - id: rad
     main: ./main.go
     binary: rad
+    env:
+      - CGO_ENABLED=1
     goos:
       - linux
     goarch:
