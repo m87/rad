@@ -1,103 +1,32 @@
 package cmd
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
-	"github.com/m87/rad/radio"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
 var cfgFile string
 var player string
+var Version = "dev"
 
 var rootCmd = &cobra.Command{
 	Use:   "rad",
 	Short: "Online radio player for the terminal",
 	Args:  cobra.MinimumNArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		err := play(args[0], player)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, "Error playing radio:", err)
-			os.Exit(1)
-		}
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return play(args[0], player)
 	},
 }
 
 func Execute() {
-	if len(os.Args) > 1 && shouldPlayDirectly(os.Args[1]) {
-		initConfig()
-		rootCmd.ParseFlags(os.Args[1:])
-		err := play(os.Args[1], player)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, "Error playing radio:", err)
-			os.Exit(1)
-		}
-		return
-	}
-
 	err := rootCmd.Execute()
 	if err != nil {
 		os.Exit(1)
 	}
 }
-
-func play(input string, player string) error {
-	url := input
-
-	stations := viper.GetStringMap("stations")
-	if strings.HasPrefix(input, "@") {
-		if stations == nil {
-			return fmt.Errorf("no stations found in config")
-		}
-
-		alias := strings.TrimPrefix(input, "@")
-		urlValue, ok := stations[alias]
-		if !ok {
-			return fmt.Errorf("station alias not found: %s", alias)
-		}
-
-		resolvedURL, ok := urlValue.(string)
-		if !ok {
-			return fmt.Errorf("station alias %s has invalid value type", alias)
-		}
-		url = resolvedURL
-	} else if stations != nil {
-		if urlValue, ok := stations[input]; ok {
-			resolvedURL, ok := urlValue.(string)
-			if !ok {
-				return fmt.Errorf("station alias %s has invalid value type", input)
-			}
-			url = resolvedURL
-		}
-	}
-
-	r := radio.NewRadio(url)
-	return r.Play(player)
-}
-
-func shouldPlayDirectly(firstArg string) bool {
-	if firstArg == "" || strings.HasPrefix(firstArg, "-") {
-		return false
-	}
-
-	for _, command := range rootCmd.Commands() {
-		if command.Name() == firstArg {
-			return false
-		}
-		for _, alias := range command.Aliases {
-			if alias == firstArg {
-				return false
-			}
-		}
-	}
-
-	return true
-}
-
 func init() {
 	cobra.OnInitialize(initConfig)
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.rad.yaml)")
@@ -118,7 +47,6 @@ func initConfig() {
 		}
 
 		viper.SetConfigFile(defaultConfigPath)
-
 	}
 
 	viper.AutomaticEnv()

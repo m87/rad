@@ -3,6 +3,7 @@
 `rad` is a lightweight terminal radio player written in Go.
 
 It can:
+
 - play an internet radio stream directly from URL,
 - save stations under aliases,
 - play by alias,
@@ -13,8 +14,8 @@ It can:
 - Direct playback from stream URL
 - Alias-based station management in a YAML config file
 - Two audio backends:
-	- `native` (built-in Go audio path)
-	- `mpv` (external `mpv` process)
+  - `native` (built-in Go audio path)
+  - `mpv` (external `mpv` process)
 - ICY metadata parsing (`Artist - Title`)
 - `status` command to read current metadata from the running player
 
@@ -59,6 +60,7 @@ rad --player mpv https://example.com/stream.mp3
 ### Play station
 
 You can play:
+
 - a full URL,
 - an alias prefixed with `@`, e.g. `@jazz`,
 - an alias without `@` if it exists in config.
@@ -94,8 +96,22 @@ rad status
 Expected output is JSON, e.g.:
 
 ```json
-{"metadata":{"Title":"Song Title","Artist":"Artist Name"}}
+{ "metadata": { "Title": "Song Title", "Artist": "Artist Name" } }
 ```
+
+### Show version
+
+```bash
+rad version
+```
+
+Default output for local development builds is:
+
+```text
+dev
+```
+
+Release binaries built by GoReleaser print the tag version (e.g. `v0.1.0`).
 
 ## Configuration
 
@@ -132,10 +148,10 @@ $HOME/.local/state/rad/rad.sock
 ## Troubleshooting
 
 - `Error playing radio`:
-	- verify stream URL is reachable,
-	- check that the stream serves MP3/ICY-compatible data.
+  - verify stream URL is reachable,
+  - check that the stream serves MP3/ICY-compatible data.
 - No output in `rad status`:
-	- ensure another `rad` process is currently playing,
-	- ensure socket file exists under `$HOME/.local/state/rad/`.
+  - ensure another `rad` process is currently playing,
+  - ensure socket file exists under `$HOME/.local/state/rad/`.
 - `--player mpv` fails:
-	- install `mpv` and confirm it is available in `PATH`.
+  - install `mpv` and confirm it is available in `PATH`.

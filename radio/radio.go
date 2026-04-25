@@ -127,6 +127,7 @@ func (r *Radio) Play(player string) error {
 		line = strings.TrimSpace(strings.ToUpper(line))
 
 		radio.mu.RLock()
+		radio.playing = true
 		playing := radio.playing
 		radio.mu.RUnlock()
 		resp := &Status{

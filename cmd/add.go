@@ -1,11 +1,7 @@
 package cmd
 
 import (
-	"fmt"
-	"os"
-
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 func NewAddCmd() *cobra.Command {
@@ -18,23 +14,14 @@ func NewAddCmd() *cobra.Command {
 		Use:     "add",
 		Aliases: []string{"a"},
 		Short:   "Add a new radio station",
-		Run: func(cmd *cobra.Command, args []string) {
-			stations := viper.GetStringMap("stations")
-			if stations == nil {
-				stations = make(map[string]interface{})
-			}
-			stations[alias] = url
-			viper.Set("stations", stations)
-			if err := viper.WriteConfig(); err != nil {
-				fmt.Fprintln(os.Stderr, "Failed to write config file:", err)
-				os.Exit(1)
-			}
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return saveStation(Station{Alias: alias, URL: url})
 		},
 	}
 	cmd.Flags().StringVarP(&url, "url", "u", "", "URL of the radio station")
 	cmd.Flags().StringVarP(&alias, "alias", "a", "", "Alias for the radio station")
-	_ = cmd.MarkFlagRequired("url")
-	_ = cmd.MarkFlagRequired("alias")
+	cmd.MarkFlagRequired("url")
+	cmd.MarkFlagRequired("alias")
 
 	return cmd
 }

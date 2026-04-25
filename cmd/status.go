@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"fmt"
 	"net"
-	"os"
 
 	"github.com/m87/rad/radio"
 	"github.com/spf13/cobra"
@@ -13,11 +12,10 @@ import (
 var statusCmd = &cobra.Command{
 	Use:   "status",
 	Short: "Show current track metadata",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		c, err := net.Dial("unix", radio.SockPath())
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "Could not connect to rad (is it running?)")
-			os.Exit(1)
+			return fmt.Errorf("could not connect to rad (is it running?)")
 		}
 		defer c.Close()
 
@@ -26,9 +24,10 @@ var statusCmd = &cobra.Command{
 		br := bufio.NewReader(c)
 		line, err := br.ReadString('\n')
 		if err != nil {
-			return
+			return err
 		}
 		fmt.Print(line)
+		return nil
 	},
 }
 
